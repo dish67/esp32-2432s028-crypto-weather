@@ -4,8 +4,6 @@
 #include <ArduinoJson.h>
 #include <TFT_eSPI.h>
 #include <lvgl.h>
-#include <array>
-
 #include "crypto_icons.h"
 
 // ========================
@@ -33,11 +31,13 @@ struct CryptoRow {
   lv_obj_t* label;
 };
 
-std::array<CryptoRow, 3> cryptoRows = {{
+CryptoRow cryptoRows[] = {
   {"bitcoin",  "BTC", &image_btc, nullptr},
   {"ethereum", "ETH", &image_eth, nullptr},
   {"bittensor","TAO", &image_tao, nullptr},
-}};
+};
+
+constexpr size_t CRYPTO_ROWS_COUNT = sizeof(cryptoRows) / sizeof(cryptoRows[0]);
 
 // ========================
 // WIFI
@@ -122,7 +122,8 @@ void updateTimestampLabel() {
 }
 
 void updateCryptoLabels(const DynamicJsonDocument& doc) {
-  for (auto& crypto : cryptoRows) {
+  for (size_t i = 0; i < CRYPTO_ROWS_COUNT; ++i) {
+    CryptoRow& crypto = cryptoRows[i];
     const double price = doc[crypto.apiId]["usd"] | 0.0;
     const String text = String(crypto.ticker) + "  $" + formatPrice(price);
     lv_label_set_text(crypto.label, text.c_str());
@@ -190,9 +191,11 @@ void create_crypto_screen() {
   lv_obj_set_size(rows_container, SCREEN_WIDTH, LV_SIZE_CONTENT);
   lv_obj_set_flex_flow(rows_container, LV_FLEX_FLOW_COLUMN);
   lv_obj_set_flex_align(rows_container, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+  lv_obj_set_style_pad_gap(rows_container, 12, 0);
   lv_obj_align(rows_container, LV_ALIGN_CENTER, 0, -10);
 
-  for (auto& crypto : cryptoRows) {
+  for (size_t i = 0; i < CRYPTO_ROWS_COUNT; ++i) {
+    CryptoRow& crypto = cryptoRows[i];
     lv_obj_t* row = lv_obj_create(rows_container);
     lv_obj_remove_style_all(row);
     lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
