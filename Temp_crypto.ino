@@ -1,43 +1,71 @@
 #include <WiFi.h>
+#include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include <TFT_eSPI.h>
 #include <lvgl.h>
-
 #include "crypto_icons.h"
 
 // ========================
 // CONFIG WIFI
 // ========================
-const char* ssid     = "BELL582";
-const char* password = "157919169AD6";
+constexpr char WIFI_SSID[]     = "BELL582";
+constexpr char WIFI_PASSWORD[] = "157919169AD6";
 
-const int SCREEN_WIDTH  = 240;
-const int SCREEN_HEIGHT = 320;
+constexpr int SCREEN_WIDTH  = 240;
+constexpr int SCREEN_HEIGHT = 320;
+constexpr unsigned long UPDATE_INTERVAL_MS = 5UL * 60UL * 1000UL;
+constexpr uint8_t WIFI_MAX_ATTEMPTS = 30;
+constexpr size_t JSON_DOC_SIZE = 768;
+constexpr char COINGECKO_URL[] = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,bittensor&vs_currencies=usd";
 
 // ========================
 // OBJETS LVGL (global)
 // ========================
-lv_obj_t* label_btc;
-lv_obj_t* label_eth;
-lv_obj_t* label_tao;
 lv_obj_t* label_update;
+
+struct CryptoRow {
+  const char* apiId;
+  const char* ticker;
+  const lv_image_dsc_t* icon;
+  lv_obj_t* label;
+};
+
+CryptoRow cryptoRows[] = {
+  {"bitcoin",  "BTC", &image_btc, nullptr},
+  {"ethereum", "ETH", &image_eth, nullptr},
+  {"bittensor","TAO", &image_tao, nullptr},
+};
+
+constexpr size_t CRYPTO_ROWS_COUNT = sizeof(cryptoRows) / sizeof(cryptoRows[0]);
 
 // ========================
 // WIFI
 // ========================
-void connectToWiFi() {
-  WiFi.begin(ssid, password);
-  Serial.print("Connexion WiFi");
+bool connectToWiFi() {
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  Serial.printf("Connexion WiFi à %s", WIFI_SSID);
 
-  for (int i = 0; i < 30; i++) {
-    if (WiFi.status() == WL_CONNECTED) break;
+  for (uint8_t attempt = 0; attempt < WIFI_MAX_ATTEMPTS && WiFi.status() != WL_CONNECTED; ++attempt) {
     delay(500);
-    Serial.print(".");
+    Serial.print('.');
   }
 
-  Serial.println(WiFi.status() == WL_CONNECTED ?
-     "\n✅ WiFi connecté" : "\n❌ Échec WiFi");
+  const bool connected = WiFi.status() == WL_CONNECTED;
+  Serial.println(connected ? "\n✅ WiFi connecté" : "\n❌ Échec WiFi");
+  return connected;
+}
+
+bool ensureWiFiConnected() {
+  if (WiFi.status() == WL_CONNECTED) {
+    return true;
+  }
+
+  Serial.println("Connexion WiFi perdue, tentative de reconnexion...");
+  WiFi.disconnect(true);
+  delay(100);
+  return connectToWiFi();
 }
 
 // ========================
@@ -54,31 +82,90 @@ void lv_tick_task(void *arg) {
 // ========================
 // FORMATAGE PRIX
 // ========================
-String formatPrice(double v) {
-  return String(v, 2);
+String formatPrice(double value) {
+  char buffer[32];
+  dtostrf(value, 0, 2, buffer);
+
+  String formatted(buffer);
+  formatted.trim();
+
+  int dotIndex = formatted.indexOf('.');
+  if (dotIndex < 0) {
+    dotIndex = formatted.length();
+  }
+
+  for (int i = dotIndex - 3; i > 0; i -= 3) {
+    formatted = formatted.substring(0, i) + "," + formatted.substring(i);
+  }
+
+  return formatted;
+}
+
+void updateStatusLabel(const String& message) {
+  if (label_update != nullptr) {
+    lv_label_set_text(label_update, message.c_str());
+  }
+}
+
+void updateTimestampLabel() {
+  if (label_update == nullptr) {
+    return;
+  }
+
+  const unsigned long seconds = millis() / 1000UL;
+  const unsigned long minutes = seconds / 60UL;
+  const unsigned long remainingSeconds = seconds % 60UL;
+
+  char buffer[48];
+  snprintf(buffer, sizeof(buffer), "Maj: %lum %lus (CoinGecko)", minutes, remainingSeconds);
+  lv_label_set_text(label_update, buffer);
+}
+
+void updateCryptoLabels(const DynamicJsonDocument& doc) {
+  for (size_t i = 0; i < CRYPTO_ROWS_COUNT; ++i) {
+    CryptoRow& crypto = cryptoRows[i];
+    const double price = doc[crypto.apiId]["usd"] | 0.0;
+    const String text = String(crypto.ticker) + "  $" + formatPrice(price);
+    lv_label_set_text(crypto.label, text.c_str());
+  }
 }
 
 // ========================
 // API CRYPTO (COINGECKO)
 // ========================
 void get_crypto_data() {
-  if (WiFi.status() != WL_CONNECTED) return;
+  if (!ensureWiFiConnected()) {
+    updateStatusLabel("WiFi indisponible");
+    return;
+  }
+
+  WiFiClientSecure client;
+  client.setInsecure();
+  client.setTimeout(15000);
 
   HTTPClient http;
-  http.begin("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,bittensor&vs_currencies=usd");
-  int code = http.GET();
+  if (!http.begin(client, COINGECKO_URL)) {
+    Serial.println("Impossible d'initialiser la requête HTTP");
+    updateStatusLabel("Erreur initialisation HTTP");
+    return;
+  }
 
-  if (code == 200) {
-    DynamicJsonDocument doc(512);
-    deserializeJson(doc, http.getString());
+  const int httpCode = http.GET();
+  if (httpCode == HTTP_CODE_OK) {
+    DynamicJsonDocument doc(JSON_DOC_SIZE);
+    const String payload = http.getString();
+    const DeserializationError err = deserializeJson(doc, payload);
 
-    double btc = doc["bitcoin"]["usd"]     | 0.0;
-    double eth = doc["ethereum"]["usd"]    | 0.0;
-    double tao = doc["bittensor"]["usd"]   | 0.0;
-
-    lv_label_set_text(label_btc, ("BTC  $" + formatPrice(btc)).c_str());
-    lv_label_set_text(label_eth, ("ETH  $" + formatPrice(eth)).c_str());
-    lv_label_set_text(label_tao, ("TAO  $" + formatPrice(tao)).c_str());
+    if (!err) {
+      updateCryptoLabels(doc);
+      updateTimestampLabel();
+    } else {
+      Serial.printf("Erreur JSON: %s\n", err.c_str());
+      updateStatusLabel("Réponse JSON invalide");
+    }
+  } else {
+    Serial.printf("Erreur HTTP: %d\n", httpCode);
+    updateStatusLabel(String("HTTP ") + httpCode);
   }
 
   http.end();
@@ -99,38 +186,44 @@ void create_crypto_screen() {
   lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 15);
   lv_obj_set_style_text_color(title, lv_color_white(), 0);
 
-  // BTC
-  lv_obj_t* btc_icon = lv_image_create(scr);
-  lv_image_set_src(btc_icon, &image_btc);
-  lv_obj_align(btc_icon, LV_ALIGN_TOP_LEFT, 20, 70);
+  constexpr lv_coord_t ROW_HEIGHT = 60;
+  const lv_coord_t rows_height = (ROW_HEIGHT * CRYPTO_ROWS_COUNT) + (10 * (CRYPTO_ROWS_COUNT - 1));
 
-  label_btc = lv_label_create(scr);
-  lv_label_set_text(label_btc, "BTC : $---");
-  lv_obj_set_style_text_font(label_btc, &lv_font_montserrat_20, 0);
-  lv_obj_set_style_text_color(label_btc, lv_color_white(), 0);
-  lv_obj_align_to(label_btc, btc_icon, LV_ALIGN_OUT_RIGHT_MID, 12, 0);
+  lv_obj_t* rows_container = lv_obj_create(scr);
+  lv_obj_remove_style_all(rows_container);
+  lv_obj_set_style_pad_all(rows_container, 0, LV_PART_MAIN);
+  lv_obj_set_size(rows_container, SCREEN_WIDTH, rows_height);
+  lv_obj_align_to(rows_container, title, LV_ALIGN_OUT_BOTTOM_MID, 0, 16);
+  lv_obj_set_flex_flow(rows_container, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_flex_align(rows_container, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+  lv_obj_set_style_pad_gap(rows_container, 10, LV_PART_MAIN);
+  lv_obj_clear_flag(rows_container, LV_OBJ_FLAG_SCROLLABLE);
 
-  // ETH
-  lv_obj_t* eth_icon = lv_image_create(scr);
-  lv_image_set_src(eth_icon, &image_eth);
-  lv_obj_align(eth_icon, LV_ALIGN_TOP_LEFT, 20, 105);
+  for (size_t i = 0; i < CRYPTO_ROWS_COUNT; ++i) {
+    CryptoRow& crypto = cryptoRows[i];
+    lv_obj_t* row = lv_obj_create(rows_container);
+    lv_obj_remove_style_all(row);
+    lv_obj_set_width(row, SCREEN_WIDTH - 32);
+    lv_obj_set_style_min_height(row, ROW_HEIGHT - 8, 0);
+    lv_obj_set_style_pad_all(row, 6, 0);
+    lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(row, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_gap(row, 12, 0);
+    lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE);
 
-  label_eth = lv_label_create(scr);
-  lv_label_set_text(label_eth, "ETH : $---");
-  lv_obj_set_style_text_font(label_eth, &lv_font_montserrat_20, 0);
-  lv_obj_set_style_text_color(label_eth, lv_color_white(), 0);
-  lv_obj_align_to(label_eth, eth_icon, LV_ALIGN_OUT_RIGHT_MID, 12, 0);
+    lv_obj_t* icon = lv_image_create(row);
+    lv_image_set_src(icon, crypto.icon);
+    lv_obj_set_style_pad_right(icon, 4, 0);
 
-  // TAO
-  lv_obj_t* tao_icon = lv_image_create(scr);
-  lv_image_set_src(tao_icon, &image_tao);
-  lv_obj_align(tao_icon, LV_ALIGN_TOP_LEFT, 20, 140);
+    crypto.label = lv_label_create(row);
+    lv_label_set_text(crypto.label, (String(crypto.ticker) + "  $---").c_str());
+    lv_obj_set_style_text_font(crypto.label, &lv_font_montserrat_20, 0);
+    lv_obj_set_style_text_color(crypto.label, lv_color_white(), 0);
+    lv_obj_set_width(crypto.label, LV_PCT(80));
+    lv_obj_set_style_text_align(crypto.label, LV_TEXT_ALIGN_CENTER, 0);
+  }
 
-  label_tao = lv_label_create(scr);
-  lv_label_set_text(label_tao, "TAO : $---");
-  lv_obj_set_style_text_font(label_tao, &lv_font_montserrat_20, 0);
-  lv_obj_set_style_text_color(label_tao, lv_color_white(), 0);
-  lv_obj_align_to(label_tao, tao_icon, LV_ALIGN_OUT_RIGHT_MID, 12, 0);
+  lv_obj_update_layout(rows_container);
 
   // Bas de page
   label_update = lv_label_create(scr);
@@ -167,8 +260,9 @@ void loop() {
   lv_timer_handler();
   delay(5);
 
-  if (millis() - lastUpd > 300000) {
-    lastUpd = millis();
+  const unsigned long now = millis();
+  if (now - lastUpd > UPDATE_INTERVAL_MS) {
+    lastUpd = now;
     get_crypto_data();
   }
 }
