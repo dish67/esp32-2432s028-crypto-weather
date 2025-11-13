@@ -19,9 +19,6 @@ constexpr int SCREEN_HEIGHT = 320;
 constexpr unsigned long UPDATE_INTERVAL_MS = 5UL * 60UL * 1000UL;
 constexpr uint8_t WIFI_MAX_ATTEMPTS = 30;
 constexpr size_t JSON_DOC_SIZE = 768;
-constexpr lv_coord_t ROW_X = 20;
-constexpr lv_coord_t ROW_FIRST_Y = 70;
-constexpr lv_coord_t ROW_STEP = 35;
 constexpr char COINGECKO_URL[] = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin,ethereum,bittensor&vs_currencies=usd";
 
 // ========================
@@ -33,14 +30,13 @@ struct CryptoRow {
   const char* apiId;
   const char* ticker;
   const lv_image_dsc_t* icon;
-  lv_coord_t yOffset;
   lv_obj_t* label;
 };
 
 std::array<CryptoRow, 3> cryptoRows = {{
-  {"bitcoin",  "BTC", &image_btc, ROW_FIRST_Y,     nullptr},
-  {"ethereum", "ETH", &image_eth, ROW_FIRST_Y + ROW_STEP, nullptr},
-  {"bittensor","TAO", &image_tao, ROW_FIRST_Y + 2 * ROW_STEP, nullptr},
+  {"bitcoin",  "BTC", &image_btc, nullptr},
+  {"ethereum", "ETH", &image_eth, nullptr},
+  {"bittensor","TAO", &image_tao, nullptr},
 }};
 
 // ========================
@@ -189,16 +185,29 @@ void create_crypto_screen() {
   lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 15);
   lv_obj_set_style_text_color(title, lv_color_white(), 0);
 
-  for (auto& crypto : cryptoRows) {
-    lv_obj_t* icon = lv_image_create(scr);
-    lv_image_set_src(icon, crypto.icon);
-    lv_obj_align(icon, LV_ALIGN_TOP_LEFT, ROW_X, crypto.yOffset);
+  lv_obj_t* rows_container = lv_obj_create(scr);
+  lv_obj_remove_style_all(rows_container);
+  lv_obj_set_size(rows_container, SCREEN_WIDTH, LV_SIZE_CONTENT);
+  lv_obj_set_flex_flow(rows_container, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_flex_align(rows_container, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+  lv_obj_align(rows_container, LV_ALIGN_CENTER, 0, -10);
 
-    crypto.label = lv_label_create(scr);
+  for (auto& crypto : cryptoRows) {
+    lv_obj_t* row = lv_obj_create(rows_container);
+    lv_obj_remove_style_all(row);
+    lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_align(row, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+    lv_obj_set_style_pad_all(row, 0, 0);
+    lv_obj_set_style_margin_bottom(row, 10, 0);
+
+    lv_obj_t* icon = lv_image_create(row);
+    lv_image_set_src(icon, crypto.icon);
+
+    crypto.label = lv_label_create(row);
     lv_label_set_text(crypto.label, (String(crypto.ticker) + " : $---").c_str());
     lv_obj_set_style_text_font(crypto.label, &lv_font_montserrat_20, 0);
     lv_obj_set_style_text_color(crypto.label, lv_color_white(), 0);
-    lv_obj_align_to(crypto.label, icon, LV_ALIGN_OUT_RIGHT_MID, 12, 0);
+    lv_obj_set_style_pad_left(crypto.label, 10, 0);
   }
 
   // Bas de page
