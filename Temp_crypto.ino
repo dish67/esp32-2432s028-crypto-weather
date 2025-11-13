@@ -186,15 +186,17 @@ void create_crypto_screen() {
   lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 15);
   lv_obj_set_style_text_color(title, lv_color_white(), 0);
 
+  constexpr lv_coord_t ROW_HEIGHT = 60;
+  const lv_coord_t rows_height = (ROW_HEIGHT * CRYPTO_ROWS_COUNT) + (10 * (CRYPTO_ROWS_COUNT - 1));
+
   lv_obj_t* rows_container = lv_obj_create(scr);
   lv_obj_remove_style_all(rows_container);
-  lv_obj_set_style_pad_all(rows_container, 0, 0);
-  lv_obj_set_width(rows_container, SCREEN_WIDTH);
-  lv_obj_set_height(rows_container, LV_SIZE_CONTENT);
-  lv_obj_align_to(rows_container, title, LV_ALIGN_OUT_BOTTOM_MID, 0, 20);
+  lv_obj_set_style_pad_all(rows_container, 0, LV_PART_MAIN);
+  lv_obj_set_size(rows_container, SCREEN_WIDTH, rows_height);
+  lv_obj_align_to(rows_container, title, LV_ALIGN_OUT_BOTTOM_MID, 0, 16);
   lv_obj_set_flex_flow(rows_container, LV_FLEX_FLOW_COLUMN);
   lv_obj_set_flex_align(rows_container, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-  lv_obj_set_style_pad_gap(rows_container, 10, 0);
+  lv_obj_set_style_pad_gap(rows_container, 10, LV_PART_MAIN);
   lv_obj_clear_flag(rows_container, LV_OBJ_FLAG_SCROLLABLE);
 
   for (size_t i = 0; i < CRYPTO_ROWS_COUNT; ++i) {
@@ -202,7 +204,7 @@ void create_crypto_screen() {
     lv_obj_t* row = lv_obj_create(rows_container);
     lv_obj_remove_style_all(row);
     lv_obj_set_width(row, SCREEN_WIDTH - 32);
-    lv_obj_set_style_min_height(row, 52, 0);
+    lv_obj_set_style_min_height(row, ROW_HEIGHT - 8, 0);
     lv_obj_set_style_pad_all(row, 6, 0);
     lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(row, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
