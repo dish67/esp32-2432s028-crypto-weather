@@ -189,10 +189,11 @@ void create_crypto_screen() {
   lv_obj_t* rows_container = lv_obj_create(scr);
   lv_obj_remove_style_all(rows_container);
   lv_obj_set_style_pad_all(rows_container, 0, 0);
-  lv_obj_set_size(rows_container, SCREEN_WIDTH, SCREEN_HEIGHT - 140);
-  lv_obj_align(rows_container, LV_ALIGN_CENTER, 0, 5);
+  lv_obj_set_width(rows_container, SCREEN_WIDTH);
+  lv_obj_set_height(rows_container, LV_SIZE_CONTENT);
+  lv_obj_align_to(rows_container, title, LV_ALIGN_OUT_BOTTOM_MID, 0, 20);
   lv_obj_set_flex_flow(rows_container, LV_FLEX_FLOW_COLUMN);
-  lv_obj_set_flex_align(rows_container, LV_FLEX_ALIGN_SPACE_EVENLY, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
+  lv_obj_set_flex_align(rows_container, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
   lv_obj_set_style_pad_gap(rows_container, 10, 0);
   lv_obj_clear_flag(rows_container, LV_OBJ_FLAG_SCROLLABLE);
 
