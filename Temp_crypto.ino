@@ -179,8 +179,17 @@ void create_crypto_screen() {
   lv_obj_set_style_bg_color(scr, lv_color_hex(0x101010), 0);
   lv_obj_set_style_bg_opa(scr, LV_OPA_COVER, 0);
 
+  lv_obj_t* column = lv_obj_create(scr);
+  lv_obj_remove_style_all(column);
+  lv_obj_set_width(column, SCREEN_WIDTH);
+  lv_obj_set_height(column, LV_SIZE_CONTENT);
+  lv_obj_set_flex_flow(column, LV_FLEX_FLOW_COLUMN);
+  lv_obj_set_style_pad_all(column, 0, 0);
+  lv_obj_set_style_pad_gap(column, 18, 0);
+  lv_obj_align(column, LV_ALIGN_TOP_MID, 0, 12);
+
   // TITRE
-  lv_obj_t* title = lv_label_create(scr);
+  lv_obj_t* title = lv_label_create(column);
   lv_label_set_text(title, "Crypto Prices");
   lv_obj_set_style_text_font(title, &lv_font_montserrat_24, 0);
   lv_obj_set_style_text_color(title, lv_color_white(), 0);
