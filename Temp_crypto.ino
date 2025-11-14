@@ -193,43 +193,38 @@ void create_crypto_screen() {
   lv_label_set_text(title, "Crypto Prices");
   lv_obj_set_style_text_font(title, &lv_font_montserrat_24, 0);
   lv_obj_set_style_text_color(title, lv_color_white(), 0);
+  lv_obj_align(title, LV_ALIGN_TOP_MID, 0, 15);
 
-  constexpr lv_coord_t ROW_HEIGHT = 64;
-
-  lv_obj_t* rows_container = lv_obj_create(column);
-  lv_obj_remove_style_all(rows_container);
-  lv_obj_set_width(rows_container, SCREEN_WIDTH);
-  lv_obj_set_height(rows_container, LV_SIZE_CONTENT);
+  lv_obj_t* rows_container = lv_obj_create(scr);
+  lv_obj_set_size(rows_container, 220, LV_SIZE_CONTENT);
+  lv_obj_align(rows_container, LV_ALIGN_TOP_MID, 0, 60);
   lv_obj_set_flex_flow(rows_container, LV_FLEX_FLOW_COLUMN);
-  lv_obj_set_flex_align(rows_container, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-  lv_obj_set_style_pad_all(rows_container, 0, 0);
-  lv_obj_set_style_pad_gap(rows_container, 12, 0);
+  lv_obj_set_flex_align(rows_container, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER);
+  lv_obj_set_style_border_width(rows_container, 0, 0);
+  lv_obj_set_style_bg_opa(rows_container, LV_OPA_TRANSP, 0);
+  lv_obj_set_style_pad_row(rows_container, 10, 0);
   lv_obj_clear_flag(rows_container, LV_OBJ_FLAG_SCROLLABLE);
 
   for (size_t i = 0; i < CRYPTO_ROWS_COUNT; ++i) {
     CryptoRow& crypto = cryptoRows[i];
     lv_obj_t* row = lv_obj_create(rows_container);
-    lv_obj_remove_style_all(row);
-    lv_obj_set_size(row, SCREEN_WIDTH - 32, ROW_HEIGHT);
-    lv_obj_set_style_pad_all(row, 8, 0);
+    lv_obj_set_size(row, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
     lv_obj_set_flex_flow(row, LV_FLEX_FLOW_ROW);
     lv_obj_set_flex_align(row, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-    lv_obj_set_style_pad_gap(row, 12, 0);
+    lv_obj_set_style_border_width(row, 0, 0);
+    lv_obj_set_style_bg_opa(row, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_pad_column(row, 10, 0);
     lv_obj_clear_flag(row, LV_OBJ_FLAG_SCROLLABLE);
 
     lv_obj_t* icon = lv_image_create(row);
     lv_image_set_src(icon, crypto.icon);
-    lv_obj_set_style_pad_right(icon, 4, 0);
 
     crypto.label = lv_label_create(row);
-    lv_label_set_text(crypto.label, (String(crypto.ticker) + "  $---").c_str());
+    lv_label_set_text(crypto.label, (String(crypto.ticker) + " : $---").c_str());
     lv_obj_set_style_text_font(crypto.label, &lv_font_montserrat_20, 0);
     lv_obj_set_style_text_color(crypto.label, lv_color_white(), 0);
-    lv_obj_set_width(crypto.label, LV_PCT(80));
-    lv_obj_set_style_text_align(crypto.label, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_set_style_text_align(crypto.label, LV_TEXT_ALIGN_LEFT, 0);
   }
-
-  lv_obj_update_layout(rows_container);
 
   // Bas de page
   label_update = lv_label_create(scr);
